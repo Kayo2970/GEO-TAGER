@@ -9,6 +9,8 @@ pip install -r requirements.txt
 python app.py        # then open http://127.0.0.1:5000
 ```
 
+> **Cloudflare Workers version:** see [`cloudflare/`](cloudflare/README.md) for a browser-only build you can deploy with `wrangler deploy`.
+
 ## What it does
 
 - **Bulk upload** of JPEG, PNG, WebP and TIFF by drag and drop; thumbnails and a per-photo card.

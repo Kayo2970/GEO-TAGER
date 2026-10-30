@@ -1,0 +1,14 @@
+{
+  "name": "geo-tager",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.js test/*.test.mjs"
+  },
+  "devDependencies": {
+    "piexifjs": "1.0.6",
+    "wrangler": "^4"
+  }
+}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GEO-TAGER</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><h1>GEO-TAGER</h1><span>Bulk geotag photos with their real location and time. Everything runs in your browser: photos are never uploaded, originals are never changed.</span></header>
+<main>
+<aside>
+  <section>
+    <h2>1. Photos</h2>
+    <label id="drop" class="drop">Drop photos here or click to choose
+      <input id="files" type="file" accept="image/jpeg,image/png,image/webp,image/tiff" multiple hidden>
+    </label>
+    <div id="uploadStatus" class="muted"></div>
+  </section>
+
+  <section>
+    <h2>2. Location</h2>
+    <div class="row"><input id="q" placeholder="Search address or place"><button id="searchBtn">Search</button></div>
+    <ul id="hits" class="hits"></ul>
+    <div id="map"></div>
+    <p class="muted small">Click the map to set the point; the address is looked up from OpenStreetMap.</p>
+    <div class="row"><input id="lat" placeholder="Latitude"><input id="lon" placeholder="Longitude"></div>
+    <input id="title" placeholder="Title, e.g. Bengaluru, Karnataka, India">
+    <textarea id="address" rows="2" placeholder="Full address"></textarea>
+    <button id="apply" class="primary">Apply to selected (0)</button>
+    <label class="check"><input type="checkbox" id="overwrite"> Overwrite GPS already in the photo</label>
+  </section>
+
+  <section>
+    <h2>3. Time</h2>
+    <label class="check"><input type="radio" name="tm" value="keep" checked> Keep the photo's own capture time</label>
+    <label class="check"><input type="radio" name="tm" value="shift"> Fix a wrong camera clock: shift by
+      <input id="shift" type="number" value="0" class="num"> minutes</label>
+    <label class="check"><input type="radio" name="tm" value="fill"> Photos with no time: set to
+      <input id="fill" type="datetime-local" step="1"></label>
+    <label class="check">Timezone (UTC offset) <input id="tz" value="+05:30" class="num"></label>
+  </section>
+
+  <section>
+    <h2>4. Overlay &amp; export</h2>
+    <label class="check"><input type="checkbox" id="overlay"> Draw location/time stamp on the photo</label>
+    <button id="previewBtn">Preview first selected</button>
+    <button id="go" class="primary">Tag and download</button>
+    <div id="status" class="muted"></div>
+  </section>
+</aside>
+
+<div class="content">
+  <div class="toolbar">
+    <button id="selAll">Select all</button>
+    <button id="selNoGps">Select without GPS</button>
+    <button id="selNone">Clear</button>
+    <button id="remove">Remove selected</button>
+    <span id="count" class="muted"></span>
+  </div>
+  <div id="grid" class="grid"></div>
+</div>
+</main>
+<div id="modal" hidden><img id="prevImg" alt="preview"><button id="closeModal">Close</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="/lib.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
