@@ -43,6 +43,69 @@ button:disabled { opacity:.5; cursor:default; }
 #modal[hidden] { display:none; } #modal img { max-width:92vw; max-height:82vh; border-radius:6px; box-shadow:0 8px 32px rgba(0,0,0,.5); }
 .spinner { display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:4px; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+footer {
+  margin-top: 24px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+footer strong { color: var(--ink); }
+.link-btn { background: none; border: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; }
+.link-btn:hover { opacity: .8; }
+
+.tc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 16px;
+}
+.tc-overlay[hidden] { display: none; }
+.tc-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-width: 540px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.3);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.tc-box h2 {
+  font-size: 16px;
+  margin: 0;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.tc-content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--bg);
+}
+.tc-content p { margin: 0 0 10px; }
+.tc-content p:last-child { margin-bottom: 0; }
+.tc-content strong { color: var(--ink); }
 </style>
 </head>
 <body>
@@ -140,9 +203,31 @@ button:disabled { opacity:.5; cursor:default; }
 </div>
 </main>
 
+<footer>
+  <div>Developed by <strong>Kayomarz Pavri</strong> • GEO-TAGER</div>
+  <div>
+    <button id="openTcBtn" class="link-btn" type="button">Terms &amp; Conditions / Disclaimer</button>
+  </div>
+</footer>
+
 <div id="modal" hidden>
   <img id="prevImg" alt="preview">
   <button id="closeModal" type="button">Close Preview</button>
+</div>
+
+<div id="tcModal" class="tc-overlay" hidden>
+  <div class="tc-box">
+    <h2>Terms &amp; Conditions &amp; Disclaimer</h2>
+    <div class="tc-content">
+      <p><strong>1. User Responsibility &amp; Liability</strong><br>
+      You acknowledge and agree that you are solely responsible and legally liable for any and all photos, geographical coordinates, timestamps, and metadata uploaded, modified, tagged, or exported using this software.</p>
+      <p><strong>2. Accuracy &amp; Lawful Use</strong><br>
+      You agree to use this software in full compliance with all applicable local, national, and international laws, privacy regulations, and intellectual property rights. You warrant that you have the legal right to process the images uploaded.</p>
+      <p><strong>3. Disclaimer of Warranty &amp; Limitation of Liability</strong><br>
+      This software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement. In no event shall the developer, <strong>Kayomarz Pavri</strong>, be held liable for any claim, damages, legal dispute, penalty, or liability arising from the use, misuse, or inability to use this software.</p>
+    </div>
+    <button id="acceptTc" class="primary" type="button">I Understand &amp; Agree</button>
+  </div>
 </div>
 
 <!-- Libraries: Leaflet for Map, PiexifJS for EXIF, JSZip for bulk archive -->
@@ -883,6 +968,27 @@ $('go').onclick = async () => {
   $('go').disabled = false;
   render();
 };
+
+// ---------- Terms & Conditions Modal ----------
+const tcModal = $('tcModal');
+if (tcModal) {
+  if (!localStorage.getItem('geotager_tc_accepted')) {
+    tcModal.hidden = false;
+  }
+  const acceptBtn = $('acceptTc');
+  if (acceptBtn) {
+    acceptBtn.onclick = () => {
+      localStorage.setItem('geotager_tc_accepted', 'true');
+      tcModal.hidden = true;
+    };
+  }
+  const openTcBtn = $('openTcBtn');
+  if (openTcBtn) {
+    openTcBtn.onclick = () => {
+      tcModal.hidden = false;
+    };
+  }
+}
 
 render();
 </script>

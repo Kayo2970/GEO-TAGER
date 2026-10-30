@@ -262,4 +262,26 @@ $('go').onclick = async () => {
   } catch (e) { $('status').textContent = 'Error: ' + e.message; }
   $('go').disabled = false;
 };
+
+// ---------- Terms & Conditions Modal ----------
+const tcModal = $('tcModal');
+if (tcModal) {
+  if (!localStorage.getItem('geotager_tc_accepted')) {
+    tcModal.hidden = false;
+  }
+  const acceptBtn = $('acceptTc');
+  if (acceptBtn) {
+    acceptBtn.onclick = () => {
+      localStorage.setItem('geotager_tc_accepted', 'true');
+      tcModal.hidden = true;
+    };
+  }
+  const openTcBtn = $('openTcBtn');
+  if (openTcBtn) {
+    openTcBtn.onclick = () => {
+      tcModal.hidden = false;
+    };
+  }
+}
+
 render();
