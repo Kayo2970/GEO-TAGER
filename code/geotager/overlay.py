@@ -52,12 +52,16 @@ def _when(taken, offset):
 
 
 def draw_overlay(img, lat, lon, title, address, taken, offset):
-    """Return a new RGB image with the stamp drawn along the bottom edge."""
+    """Return a new RGB image with the stamp dynamically scaled strictly within the lower 1/4."""
     img = img.convert("RGB")
     w, h = img.size
-    s = max(0.35, w / 2000)
-    pad, map_px = int(45 * s), int(330 * s)
-    band_h = map_px + 2 * pad
+
+    # Geotagged stamp strictly occupies the lower 1/4 (24% max) of the photo
+    # dynamically across all resolutions, aspect ratios (portrait, panoramic, 4K, 8K, small).
+    band_h = max(36, int(h * 0.24))
+    pad = max(4, int(band_h * 0.08))
+    map_px = max(24, band_h - 2 * pad)
+    s = band_h / 420.0
 
     shade = Image.new("RGBA", (w, band_h), (0, 0, 0, 120))
     base = img.convert("RGBA")
@@ -68,22 +72,43 @@ def draw_overlay(img, lat, lon, title, address, taken, offset):
     top = h - band_h + pad
     if tile is None:
         tile = Image.new("RGB", (map_px, map_px), (70, 80, 90))
-        ImageDraw.Draw(tile).text((map_px / 2, map_px - 24 * s), "map unavailable",
-                                  fill=(200, 200, 200), font=_font(int(22 * s)), anchor="mm")
+        ImageDraw.Draw(tile).text((map_px / 2, map_px - max(6, int(24 * s))), "map unavailable",
+                                  fill=(200, 200, 200), font=_font(max(8, int(22 * s))), anchor="mm")
     base.paste(tile, (pad, top))
-    _pin(draw, pad + map_px / 2, top + map_px / 2, 18 * s)
+    _pin(draw, pad + map_px / 2, top + map_px / 2, max(3, 18 * s))
 
     x = pad + map_px + pad
     width = w - x - pad
-    f_title, f_body = _font(int(58 * s), True), _font(int(40 * s))
-    y = top - int(6 * s)
+
+    # Scale font sizes dynamically to fit neatly within available map_px height
+    raw_lines = [title or f"{lat:.5f}, {lon:.5f}"]
+    if address:
+        raw_lines.append(address)
+    raw_lines.append(f"Lat {lat:.6f}, Long {lon:.6f}")
+    if taken:
+        raw_lines.append(_when(taken, offset))
+
+    num_slots = len(raw_lines) + (1 if address and len(address) > 35 else 0)
+    line_h = max(8, int(map_px / max(3.5, num_slots)))
+    title_size = max(10, int(line_h * 0.95))
+    body_size = max(8, int(line_h * 0.78))
+
+    f_title = _font(title_size, True)
+    f_body = _font(body_size)
+
     lines = [(t, f_title) for t in _wrap(draw, title or f"{lat:.5f}, {lon:.5f}", f_title, width, 1)]
-    lines += [(t, f_body) for t in _wrap(draw, address or "", f_body, width, 2)]
+    if address:
+        lines += [(t, f_body) for t in _wrap(draw, address, f_body, width, 2)]
     lines.append((f"Lat {lat:.6f}, Long {lon:.6f}", f_body))
     if taken:
         lines.append((_when(taken, offset), f_body))
+
+    y = top
     for text, font in lines:
+        if y + font.size > h:
+            break
         draw.text((x, y), text, fill="white", font=font, stroke_width=max(1, int(s)),
                   stroke_fill=(0, 0, 0))
-        y += int(font.size * 1.3)
+        y += max(font.size + 2, int(font.size * 1.25))
+
     return base.convert("RGB")

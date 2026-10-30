@@ -715,10 +715,12 @@ async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset,
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0, w, h);
 
-  const s = Math.max(0.35, w / 2000);
-  const pad = Math.round(45 * s);
-  const mapPx = Math.round(330 * s);
-  const bandH = mapPx + 2 * pad;
+  // Geotagged stamp strictly occupies the lower 1/4 (24% max) of the photo
+  // dynamically across all resolutions, aspect ratios (portrait, panoramic, 4K, 8K, small).
+  const bandH = Math.max(36, Math.round(h * 0.24));
+  const pad = Math.max(4, Math.round(bandH * 0.08));
+  const mapPx = Math.max(24, bandH - 2 * pad);
+  const s = bandH / 420.0;
 
   ctx.fillStyle = 'rgba(0, 0, 0, 0.47)';
   ctx.fillRect(0, h - bandH, w, bandH);
@@ -733,19 +735,22 @@ async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset,
     ctx.fillRect(pad, top, mapPx, mapPx);
   }
 
-  drawPin(ctx, pad + mapPx / 2, top + mapPx / 2, 18 * s);
+  drawPin(ctx, pad + mapPx / 2, top + mapPx / 2, Math.max(3, 18 * s));
 
   const x = pad + mapPx + pad;
   const width = w - x - pad;
-  const titleSize = Math.round(58 * s);
-  const bodySize = Math.round(40 * s);
 
-  let y = top - Math.round(6 * s);
+  const numSlots = 3.5 + (address && address.length > 35 ? 1 : 0) + (taken ? 1 : 0);
+  const lineH = Math.max(8, Math.round(mapPx / numSlots));
+  const titleSize = Math.max(10, Math.round(lineH * 0.95));
+  const bodySize = Math.max(8, Math.round(lineH * 0.78));
+
+  let y = top;
 
   ctx.font = `bold ${titleSize}px system-ui, -apple-system, sans-serif`;
   ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = Math.max(2, Math.round(s * 3));
+  ctx.lineWidth = Math.max(1.5, Math.round(s * 3));
 
   const displayTitle = title || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   const titleLines = wrapText(ctx, displayTitle, width, 1);
@@ -756,23 +761,26 @@ async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset,
   }
 
   ctx.font = `500 ${bodySize}px system-ui, -apple-system, sans-serif`;
-  ctx.lineWidth = Math.max(1.5, Math.round(s * 2));
+  ctx.lineWidth = Math.max(1, Math.round(s * 2));
 
   if (address) {
     const addrLines = wrapText(ctx, address, width, 2);
     for (const line of addrLines) {
+      if (y + bodySize > h) break;
       ctx.strokeText(line, x, y + bodySize);
       ctx.fillText(line, x, y + bodySize);
       y += Math.round(bodySize * 1.25);
     }
   }
 
-  const coordText = `Lat ${lat.toFixed(6)}, Long ${lon.toFixed(6)}`;
-  ctx.strokeText(coordText, x, y + bodySize);
-  ctx.fillText(coordText, x, y + bodySize);
-  y += Math.round(bodySize * 1.25);
+  if (y + bodySize <= h) {
+    const coordText = `Lat ${lat.toFixed(6)}, Long ${lon.toFixed(6)}`;
+    ctx.strokeText(coordText, x, y + bodySize);
+    ctx.fillText(coordText, x, y + bodySize);
+    y += Math.round(bodySize * 1.25);
+  }
 
-  if (taken) {
+  if (taken && y + bodySize <= h) {
     const timeText = formatWhen(taken, offset);
     ctx.strokeText(timeText, x, y + bodySize);
     ctx.fillText(timeText, x, y + bodySize);

@@ -75,7 +75,7 @@ def test_time_shift_and_fill(tmp_path):
     assert ex.read_meta(dst)["datetime"] == "2026-10-27T09:51:00"
 
 
-@pytest.mark.parametrize("size", [(2000, 1500), (900, 1600), (400, 300)])
+@pytest.mark.parametrize("size", [(2000, 1500), (900, 1600), (400, 300), (3840, 1080), (1920, 1080)])
 def test_overlay_draws_in_bottom_band_only(tmp_path, size):
     src = make_jpeg(tmp_path / "a.jpg", "2026:10:27 09:51:00", size)
     dst = tmp_path / "o.jpg"
@@ -83,9 +83,11 @@ def test_overlay_draws_in_bottom_band_only(tmp_path, size):
                   "Amruth Nagar Main Road, Konanakunte, Bengaluru", Options(overlay=True))
     out, orig = Image.open(dst), Image.open(src)
     assert out.size == orig.size
-    assert out.crop((0, 0, size[0], size[1] // 4)).tobytes() != b""
-    top_diff = sum(abs(a - b) for a, b in zip(out.getpixel((5, 5)), orig.getpixel((5, 5))))
-    assert top_diff < 12  # only JPEG noise at the top
+    # Top 70% of the image is completely untouched (overlay strictly in lower 1/4)
+    check_y = int(size[1] * 0.70)
+    top_diff = sum(abs(a - b) for a, b in zip(out.getpixel((size[0] // 2, check_y)), orig.getpixel((size[0] // 2, check_y))))
+    assert top_diff < 12  # untouched at 70% height
+    # Bottom of the image has overlay
     assert out.getpixel((size[0] // 2, size[1] - 3)) != orig.getpixel((size[0] // 2, size[1] - 3))
     assert ex.read_meta(dst)["lat"] == 12.88802
 

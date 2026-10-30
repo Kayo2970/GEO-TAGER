@@ -172,31 +172,43 @@ function wrap(ctx, text, width, maxLines) {
 }
 
 async function drawOverlay(ctx, w, h, { lat, lon, title, address, taken, offset }) {
-  const s = Math.max(0.35, w / 2000), pad = Math.round(45 * s), mapPx = Math.round(330 * s), bandH = mapPx + 2 * pad, top = h - bandH + pad;
+  const bandH = Math.max(36, Math.round(h * 0.24)), pad = Math.max(4, Math.round(bandH * 0.08));
+  const mapPx = Math.max(24, bandH - 2 * pad), s = bandH / 420.0, top = h - bandH + pad;
   ctx.fillStyle = 'rgba(0,0,0,0.47)'; ctx.fillRect(0, h - bandH, w, bandH);
   const tile = await mapImage(lat, lon, mapPx);
   if (tile) ctx.drawImage(tile, pad, top);
   else {
     ctx.fillStyle = '#46505a'; ctx.fillRect(pad, top, mapPx, mapPx);
-    ctx.fillStyle = '#c8c8c8'; ctx.font = `${22 * s}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('map unavailable', pad + mapPx / 2, top + mapPx - 24 * s);
+    ctx.fillStyle = '#c8c8c8'; ctx.font = `${Math.max(8, 22 * s)}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('map unavailable', pad + mapPx / 2, top + mapPx - max(6, 24 * s));
   }
   // pin
-  const px = pad + mapPx / 2, py = top + mapPx / 2, r = 18 * s;
+  const px = pad + mapPx / 2, py = top + mapPx / 2, r = Math.max(3, 18 * s);
   ctx.fillStyle = '#d62828'; ctx.beginPath(); ctx.moveTo(px - r * .6, py - r * .9); ctx.lineTo(px + r * .6, py - r * .9); ctx.lineTo(px, py); ctx.fill();
   ctx.beginPath(); ctx.arc(px, py - r * 1.2, r, 0, 7); ctx.fill(); ctx.lineWidth = Math.max(1, r / 5); ctx.strokeStyle = '#fff'; ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, py - r * 1.2, r * .35, 0, 7); ctx.fill();
 
   const x = pad + mapPx + pad, width = w - x - pad;
-  const F = (px, bold) => `${bold ? 'bold ' : ''}${Math.round(px * s)}px "DejaVu Sans", Arial, sans-serif`;
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000'; ctx.lineWidth = Math.max(2, 2 * s);
+  const numSlots = 3.5 + (address && address.length > 35 ? 1 : 0) + (taken ? 1 : 0);
+  const lineH = Math.max(8, Math.round(mapPx / numSlots));
+  const titleSize = Math.max(10, Math.round(lineH * 0.95));
+  const bodySize = Math.max(8, Math.round(lineH * 0.78));
+
+  const F = (px, bold) => `${bold ? 'bold ' : ''}${px}px "DejaVu Sans", Arial, sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000'; ctx.lineWidth = Math.max(1.5, s * 3);
   const lines = [];
-  ctx.font = F(58, true); wrap(ctx, title || `${lat.toFixed(5)}, ${lon.toFixed(5)}`, width, 1).forEach(t => lines.push([t, 58, true]));
-  ctx.font = F(40); wrap(ctx, address || '', width, 2).forEach(t => lines.push([t, 40]));
-  lines.push([`Lat ${lat.toFixed(6)}, Long ${lon.toFixed(6)}`, 40]);
-  if (taken) lines.push([GeoLib.formatWhen(taken, offset), 40]);
-  lines.push(['Note : Location and time added after capture (GEO-TAGER)', 32]);
-  let y = top - 6 * s;
-  for (const [t, px, bold] of lines) { ctx.font = F(px, bold); ctx.strokeText(t, x, y); ctx.fillText(t, x, y); y += px * s * 1.3; }
+  wrap(ctx, title || `${lat.toFixed(5)}, ${lon.toFixed(5)}`, width, 1).forEach(t => lines.push([t, titleSize, true]));
+  if (address) wrap(ctx, address, width, 2).forEach(t => lines.push([t, bodySize, false]));
+  lines.push([`Lat ${lat.toFixed(6)}, Long ${lon.toFixed(6)}`, bodySize, false]);
+  if (taken) lines.push([GeoLib.formatWhen(taken, offset), bodySize, false]);
+
+  let y = top;
+  for (const [t, px, bold] of lines) {
+    if (y + px > h) break;
+    ctx.font = F(px, bold);
+    ctx.strokeText(t, x, y);
+    ctx.fillText(t, x, y);
+    y += Math.max(px + 2, Math.round(px * 1.25));
+  }
 }
 
 // ---------- tagging ----------
