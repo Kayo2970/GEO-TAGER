@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GEO-TAGER</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root { --bg:#f4f5f7; --card:#fff; --ink:#1c2024; --muted:#6b7280; --accent:#1f6feb; --line:#d9dce1; --ok:#1a7f37; --warn:#b45309; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14171a; --card:#1e2227; --ink:#e6e8eb; --muted:#9aa3ad; --line:#333a42; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 system-ui, -apple-system, sans-serif; }
+header { padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+h1 { margin:0; font-size:18px; } h2 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+main { display:grid; grid-template-columns:360px 1fr; gap:16px; padding:16px; align-items:start; }
+@media (max-width:860px) { main { grid-template-columns:1fr; } }
+aside section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:12px; }
+input, textarea, select, button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+input, textarea, select { width:100%; margin-bottom:6px; } textarea { resize:vertical; }
+input[type=radio], input[type=checkbox] { width:auto; margin:0 6px 0 0; }
+.num { width:84px; display:inline-block; margin:0 4px; }
+.row { display:flex; gap:6px; } .row input { margin-bottom:6px; }
+button { cursor:pointer; } button:hover { border-color:var(--accent); }
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; width:100%; margin:4px 0; font-weight:600; }
+button:disabled { opacity:.5; cursor:default; }
+#previewBtn { width:100%; margin-bottom:4px; }
+.check { display:block; margin:6px 0; } .muted { color:var(--muted); } .small { font-size:12px; margin:4px 0; }
+.time-sub { border-left: 2px solid var(--accent); padding-left: 8px; }
+.drop { display:block; border:2px dashed var(--line); border-radius:8px; padding:22px 10px; text-align:center; cursor:pointer; transition:border-color .15s; }
+.drop.over { border-color:var(--accent); }
+#map { height:260px; border-radius:6px; border:1px solid var(--line); margin-bottom:6px; }
+.hits { list-style:none; margin:0 0 6px; padding:0; max-height:160px; overflow-y:auto; }
+.hits li { padding:6px 8px; border:1px solid var(--line); border-radius:6px; margin-bottom:4px; cursor:pointer; font-size:12px; background:var(--card); }
+.hits li:hover { border-color:var(--accent); background:var(--bg); }
+.toolbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; }
+.card { background:var(--card); border:2px solid var(--line); border-radius:8px; overflow:hidden; cursor:pointer; transition:border-color .15s; }
+.card.sel { border-color:var(--accent); } .card img { width:100%; height:130px; object-fit:cover; display:block; background:#222; }
+.card .info { padding:6px 8px; font-size:12px; } .card .name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.badge { display:inline-block; padding:1px 6px; border-radius:10px; font-size:11px; margin:2px 3px 0 0; background:var(--bg); border:1px solid var(--line); }
+.badge.ok { color:var(--ok); border-color:var(--ok); } .badge.warn { color:var(--warn); border-color:var(--warn); }
+#modal { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:2000; padding:16px; }
+#modal[hidden] { display:none; } #modal img { max-width:92vw; max-height:82vh; border-radius:6px; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+.spinner { display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:4px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>GEO-TAGER</h1>
+  <span>Local photo bulk geotagging with Google Satellite imagery. Everything runs locally in your browser.</span>
+</header>
+<main>
+<aside>
+  <section>
+    <h2>1. Photos</h2>
+    <label id="drop" class="drop">Drop photos here or click to choose
+      <input id="files" type="file" accept="image/jpeg,image/png,image/webp,image/tiff" multiple hidden>
+    </label>
+    <div id="uploadStatus" class="muted small"></div>
+  </section>
+
+  <section>
+    <h2>2. Location</h2>
+    <div class="row">
+      <input id="q" placeholder="Search address, landmark or city">
+      <button id="searchBtn" type="button">Search</button>
+    </div>
+    <ul id="hits" class="hits"></ul>
+    <div id="map"></div>
+    <p class="muted small">Click map or search to set coordinates. Default view: Google Satellite.</p>
+    <div class="row">
+      <input id="lat" placeholder="Latitude">
+      <input id="lon" placeholder="Longitude">
+    </div>
+    <input id="title" placeholder="Title, e.g. Bengaluru, Karnataka, India">
+    <textarea id="address" rows="2" placeholder="Full address"></textarea>
+
+    <label class="check"><input type="checkbox" id="randomizeLoc"> Randomize location within area</label>
+    <div id="radiusRow" class="row" style="display:none; align-items:center; margin-bottom:6px;">
+      <input id="radiusMeters" type="number" min="10" max="100000" step="50" value="500" placeholder="Radius (meters)">
+      <span class="muted small" style="white-space:nowrap;">meters radius</span>
+    </div>
+
+    <button id="apply" type="button" class="primary">Apply to selected (0)</button>
+    <label class="check"><input type="checkbox" id="overwrite"> Overwrite GPS already in the photo</label>
+  </section>
+
+  <section>
+    <h2>3. Time</h2>
+    <label class="check"><input type="radio" name="tm" value="keep" checked> Keep the photo's own capture time</label>
+
+    <label class="check"><input type="radio" name="tm" value="static"> Set static date &amp; time for all photos</label>
+    <div id="staticBox" class="time-sub" style="display:none; margin:4px 0 8px 18px;">
+      <input id="staticTime" type="datetime-local" step="1">
+    </div>
+
+    <label class="check"><input type="radio" name="tm" value="range"> Distribute across a time range</label>
+    <div id="rangeBox" class="time-sub" style="display:none; margin:4px 0 8px 18px;">
+      <div class="small muted">From:</div>
+      <input id="rangeStart" type="datetime-local" step="1">
+      <div class="small muted">To:</div>
+      <input id="rangeEnd" type="datetime-local" step="1">
+      <div class="small muted">Distribution:</div>
+      <select id="rangeDist" style="width:100%; margin-bottom:6px;">
+        <option value="random">Random timestamps within range</option>
+        <option value="spread">Evenly spaced (chronological)</option>
+      </select>
+    </div>
+
+    <label class="check"><input type="radio" name="tm" value="shift"> Fix a wrong camera clock: shift by
+      <input id="shift" type="number" value="0" class="num"> minutes</label>
+    <label class="check"><input type="radio" name="tm" value="fill"> Photos with no time: set to
+      <input id="fill" type="datetime-local" step="1"></label>
+
+    <label class="check" id="overwriteTimeLabel" style="margin-top:6px;">
+      <input type="checkbox" id="overwriteTime" checked> Overwrite existing photo time (for static/range)
+    </label>
+    <label class="check">Timezone (UTC offset) <input id="tz" value="+05:30" class="num"></label>
+  </section>
+
+  <section>
+    <h2>4. Overlay &amp; export</h2>
+    <label class="check"><input type="checkbox" id="overlay" checked> Draw location/time stamp on the photo</label>
+    <button id="previewBtn" type="button">Preview first selected</button>
+    <button id="go" type="button" class="primary">Tag and download</button>
+    <div id="status" class="muted small" style="margin-top:6px;"></div>
+  </section>
+</aside>
+
+<div class="content">
+  <div class="toolbar">
+    <button id="selAll" type="button">Select all</button>
+    <button id="selNoGps" type="button">Select without GPS</button>
+    <button id="selNone" type="button">Clear</button>
+    <button id="remove" type="button">Remove selected</button>
+    <span id="count" class="muted small"></span>
+  </div>
+  <div id="grid" class="grid"></div>
+</div>
+</main>
+
+<div id="modal" hidden>
+  <img id="prevImg" alt="preview">
+  <button id="closeModal" type="button">Close Preview</button>
+</div>
+
+<!-- Libraries: Leaflet for Map, PiexifJS for EXIF, JSZip for bulk archive -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+const $ = id => document.getElementById(id);
+const photos = []; // {id, name, file, meta, loc, selected, result, dataUrl}
+let marker = null;
+let radiusCircle = null;
+let scatterMarkers = [];
+
+// ---------- Leaflet Map with Google Satellite as Default ----------
+const map = L.map('map').setView([20.5937, 78.9629], 4);
+
+const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+  subdomains: ['0', '1', '2', '3'],
+  maxZoom: 20,
+  attribution: '© Google Maps'
+});
+
+const googlePure = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  subdomains: ['0', '1', '2', '3'],
+  maxZoom: 20,
+  attribution: '© Google Maps'
+});
+
+const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap contributors'
+});
+
+// Add Google Satellite as default base layer
+googleSat.addTo(map);
+
+L.control.layers({
+  'Google Satellite': googleSat,
+  'Satellite (Clean)': googlePure,
+  'Street Map (OSM)': osm
+}, null, { position: 'topright' }).addTo(map);
+
+function clearScatterMarkers() {
+  scatterMarkers.forEach(m => map.removeLayer(m));
+  scatterMarkers = [];
+}
+
+function randomizeCoords(lat, lon, radiusMeters) {
+  if (radiusMeters <= 0) return { lat, lon };
+  const r = radiusMeters * Math.sqrt(Math.random());
+  const theta = Math.random() * 2 * Math.PI;
+  const dx = r * Math.cos(theta);
+  const dy = r * Math.sin(theta);
+  const dlat = dy / 111139.0;
+  const cosLat = Math.cos(lat * Math.PI / 180.0);
+  const dlon = dx / (111139.0 * (Math.abs(cosLat) < 1e-6 ? 1e-6 : cosLat));
+  const newLat = Math.max(-90, Math.min(90, lat + dlat));
+  const newLon = ((lon + dlon + 180) % 360) - 180;
+  return { lat: +newLat.toFixed(6), lon: +newLon.toFixed(6) };
+}
+
+function updateRadiusCircle() {
+  const isRand = $('randomizeLoc').checked;
+  $('radiusRow').style.display = isRand ? 'flex' : 'none';
+  const la = parseFloat($('lat').value), lo = parseFloat($('lon').value);
+  const radius = parseFloat($('radiusMeters').value) || 500;
+  if (isRand && !isNaN(la) && !isNaN(lo) && radius > 0) {
+    if (radiusCircle) {
+      radiusCircle.setLatLng([la, lo]).setRadius(radius);
+    } else {
+      radiusCircle = L.circle([la, lo], {
+        radius: radius,
+        color: '#1f6feb',
+        fillColor: '#1f6feb',
+        fillOpacity: 0.15
+      }).addTo(map);
+    }
+  } else if (radiusCircle) {
+    map.removeLayer(radiusCircle);
+    radiusCircle = null;
+  }
+}
+
+$('randomizeLoc').addEventListener('change', updateRadiusCircle);
+$('radiusMeters').addEventListener('input', updateRadiusCircle);
+
+function setPoint(lat, lon, fly) {
+  $('lat').value = (+lat).toFixed(6); $('lon').value = (+lon).toFixed(6);
+  if (marker) marker.setLatLng([lat, lon]); else marker = L.marker([lat, lon]).addTo(map);
+  updateRadiusCircle();
+  if (fly) {
+    if ($('randomizeLoc').checked && radiusCircle) {
+      map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20], maxZoom: 17 });
+    } else {
+      map.setView([lat, lon], 16);
+    }
+  }
+}
+
+map.on('click', async e => {
+  setPoint(e.latlng.lat, e.latlng.lng);
+  $('title').value = ''; $('address').value = '';
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${e.latlng.lat}&lon=${e.latlng.lng}&zoom=18&addressdetails=1`);
+    if (res.ok) {
+      const d = await res.json();
+      const addr = d.address || {};
+      const place = addr.city || addr.town || addr.village || addr.suburb || addr.county || '';
+      const parts = [place, addr.state, addr.country].filter(Boolean);
+      $('title').value = parts.join(', ');
+      $('address').value = d.display_name || '';
+    }
+  } catch (err) {
+    console.warn('Reverse geocoding error:', err);
+  }
+});
+
+['lat', 'lon'].forEach(id => $(id).addEventListener('change', () => {
+  const la = parseFloat($('lat').value), lo = parseFloat($('lon').value);
+  if (!isNaN(la) && !isNaN(lo)) setPoint(la, lo, true);
+}));
+
+$('searchBtn').onclick = async () => {
+  const q = $('q').value.trim(); if (!q) return;
+  const ul = $('hits'); ul.innerHTML = '<li>Searching...</li>';
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`);
+    const hits = await res.json();
+    ul.innerHTML = '';
+    if (!hits.length) { ul.innerHTML = '<li>No results found</li>'; return; }
+    hits.forEach(h => {
+      const li = document.createElement('li');
+      const addr = h.address || {};
+      const place = addr.city || addr.town || addr.village || addr.suburb || addr.county || '';
+      const title = [place, addr.state, addr.country].filter(Boolean).join(', ');
+      li.textContent = h.display_name;
+      li.onclick = () => {
+        setPoint(+h.lat, +h.lon, true);
+        $('title').value = title;
+        $('address').value = h.display_name;
+        ul.innerHTML = '';
+      };
+      ul.appendChild(li);
+    });
+  } catch (err) {
+    ul.innerHTML = `<li>Search failed: ${err.message}</li>`;
+  }
+};
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') $('searchBtn').click(); });
+
+// ---------- Time Controls ----------
+function initTimeInputs() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const localIso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  if (!$('staticTime').value) $('staticTime').value = localIso(now);
+  if (!$('rangeStart').value) {
+    const s = new Date(now); s.setHours(9, 0, 0, 0);
+    $('rangeStart').value = localIso(s);
+  }
+  if (!$('rangeEnd').value) {
+    const e = new Date(now); e.setHours(18, 0, 0, 0);
+    $('rangeEnd').value = localIso(e);
+  }
+}
+
+function updateTimeVisibility() {
+  const tm = document.querySelector('input[name=tm]:checked').value;
+  $('staticBox').style.display = tm === 'static' ? 'block' : 'none';
+  $('rangeBox').style.display = tm === 'range' ? 'block' : 'none';
+  if (tm === 'static' || tm === 'range') initTimeInputs();
+}
+document.querySelectorAll('input[name=tm]').forEach(el => el.addEventListener('change', updateTimeVisibility));
+updateTimeVisibility();
+
+// ---------- Upload & Client-side EXIF Reading ----------
+const drop = $('drop');
+['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); handleFiles([...e.dataTransfer.files]); });
+$('files').onchange = e => { handleFiles([...e.target.files]); e.target.value = ''; };
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function parseDms(dms, ref) {
+  if (!dms || !dms.length) return null;
+  const deg = dms[0][0] / dms[0][1];
+  const min = dms[1][0] / dms[1][1];
+  const sec = dms[2][0] / dms[2][1];
+  const val = deg + min / 60.0 + sec / 3600.0;
+  return (ref === 'S' || ref === 'W') ? -val : val;
+}
+
+function extractMeta(dataUrl) {
+  const meta = { datetime: null, offset: null, lat: null, lon: null, rawExif: null };
+  try {
+    const exifObj = piexif.load(dataUrl);
+    meta.rawExif = exifObj;
+    if (exifObj.Exif) {
+      const dt = exifObj.Exif[piexif.ExifIFD.DateTimeOriginal] || exifObj.Exif[piexif.ExifIFD.DateTimeDigitized];
+      if (dt && typeof dt === 'string') {
+        const parts = dt.trim().split(' ');
+        if (parts.length === 2) {
+          meta.datetime = parts[0].replace(/:/g, '-') + 'T' + parts[1];
+        }
+      }
+      const off = exifObj.Exif[piexif.ExifIFD.OffsetTimeOriginal] || exifObj.Exif[piexif.ExifIFD.OffsetTime];
+      if (off && typeof off === 'string') meta.offset = off.trim();
+    }
+    if (exifObj.GPS) {
+      const gps = exifObj.GPS;
+      const lat = parseDms(gps[piexif.GPSIFD.GPSLatitude], gps[piexif.GPSIFD.GPSLatitudeRef]);
+      const lon = parseDms(gps[piexif.GPSIFD.GPSLongitude], gps[piexif.GPSIFD.GPSLongitudeRef]);
+      if (lat != null && lon != null && !(lat === 0 && lon === 0)) {
+        meta.lat = +lat.toFixed(6);
+        meta.lon = +lon.toFixed(6);
+      }
+    }
+  } catch (err) {
+    // Non-JPEG or missing EXIF
+  }
+  return meta;
+}
+
+async function handleFiles(files) {
+  files = files.filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  $('uploadStatus').textContent = `Reading ${files.length} photo(s)...`;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      const dataUrl = await readFileAsDataURL(file);
+      const meta = extractMeta(dataUrl);
+      const pid = 'p_' + Math.random().toString(36).substr(2, 9);
+      photos.push({
+        id: pid,
+        name: file.name,
+        file: file,
+        dataUrl: dataUrl,
+        meta: meta,
+        loc: null,
+        selected: false,
+        result: null
+      });
+    } catch (err) {
+      console.error('Error reading', file.name, err);
+    }
+  }
+  $('uploadStatus').textContent = `${photos.length} photo(s) loaded.`;
+  render();
+}
+
+// ---------- Grid Rendering ----------
+const fmtTime = iso => iso ? iso.replace('T', ' ') : null;
+function render() {
+  const g = $('grid'); g.innerHTML = '';
+  photos.forEach((p, i) => {
+    const c = document.createElement('div');
+    c.className = 'card' + (p.selected ? ' sel' : '');
+    const gps = p.meta.lat != null ? `<span class="badge ok">GPS ${p.meta.lat.toFixed(4)}, ${p.meta.lon.toFixed(4)}</span>` : '<span class="badge warn">no GPS</span>';
+    const t = fmtTime(p.meta.datetime);
+    const time = t ? `<span class="badge ok">${t}</span>` : '<span class="badge warn">no time</span>';
+    const loc = p.loc ? `<span class="badge ok">→ ${p.loc.title ? p.loc.title + ' ' : ''}(${p.loc.lat.toFixed(4)}, ${p.loc.lon.toFixed(4)})</span>` : '';
+    const res = p.result ? `<span class="badge ${p.result.status === 'ok' ? 'ok' : 'warn'}">${p.result.status}${p.result.detail ? ': ' + p.result.detail : ''}</span>` : '';
+    c.innerHTML = `<img src="${p.dataUrl}" loading="lazy"><div class="info"><div class="name" title="${p.name}">${p.name}</div>${gps}${time}${loc}${res}</div>`;
+    c.onclick = () => { p.selected = !p.selected; render(); };
+    g.appendChild(c);
+  });
+  const n = photos.filter(p => p.selected).length;
+  $('count').textContent = `${photos.length} photos, ${n} selected`;
+  $('apply').textContent = `Apply to selected (${n})`;
+}
+
+$('selAll').onclick = () => { photos.forEach(p => p.selected = true); render(); };
+$('selNone').onclick = () => { photos.forEach(p => p.selected = false); render(); };
+$('selNoGps').onclick = () => { photos.forEach(p => p.selected = p.meta.lat == null); render(); };
+$('remove').onclick = () => {
+  for (let i = photos.length - 1; i >= 0; i--) if (photos[i].selected) photos.splice(i, 1);
+  clearScatterMarkers();
+  render();
+};
+
+$('apply').onclick = () => {
+  const lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
+  if (isNaN(lat) || isNaN(lon)) return alert('Pick a location on the map or search for one first.');
+  const title = $('title').value.trim(), address = $('address').value.trim();
+  const isRand = $('randomizeLoc').checked;
+  const radius = parseFloat($('radiusMeters').value) || 500;
+  const sel = photos.filter(p => p.selected);
+  if (!sel.length) return alert('Select the photos to apply location to.');
+
+  clearScatterMarkers();
+  sel.forEach(p => {
+    if (isRand && radius > 0) {
+      const pt = randomizeCoords(lat, lon, radius);
+      p.loc = { lat: pt.lat, lon: pt.lon, title, address, is_randomized: true };
+      const sm = L.circleMarker([pt.lat, pt.lon], {
+        radius: 5,
+        color: '#1a7f37',
+        fillColor: '#2da44e',
+        fillOpacity: 0.8
+      }).bindTooltip(p.name).addTo(map);
+      scatterMarkers.push(sm);
+    } else {
+      p.loc = { lat, lon, title, address };
+    }
+  });
+  render();
+};
+
+// ---------- Options & Time Resolution ----------
+function getOptions() {
+  const tm = document.querySelector('input[name=tm]:checked').value;
+  return {
+    overlay: $('overlay').checked,
+    time_mode: tm,
+    shift_minutes: parseInt($('shift').value || 0),
+    fill_datetime: $('fill').value,
+    static_datetime: $('staticTime').value,
+    range_start: $('rangeStart').value,
+    range_end: $('rangeEnd').value,
+    range_distribution: $('rangeDist').value,
+    overwrite_time: $('overwriteTime').checked,
+    overwrite_gps: $('overwrite').checked,
+    tz: $('tz').value.trim() || '+05:30'
+  };
+}
+
+function resolvePhotoTime(meta, opts, index, total) {
+  let taken = meta.datetime ? new Date(meta.datetime) : null;
+  if (opts.time_mode === 'shift' && taken) {
+    taken = new Date(taken.getTime() + opts.shift_minutes * 60000);
+  } else if (opts.time_mode === 'fill' && !taken && opts.fill_datetime) {
+    taken = new Date(opts.fill_datetime);
+  } else if (opts.time_mode === 'static') {
+    if (opts.overwrite_time || !taken) {
+      if (opts.static_datetime) taken = new Date(opts.static_datetime);
+    }
+  } else if (opts.time_mode === 'range') {
+    if (opts.overwrite_time || !taken) {
+      if (opts.range_start && opts.range_end) {
+        let t0 = new Date(opts.range_start).getTime();
+        let t1 = new Date(opts.range_end).getTime();
+        if (t0 > t1) [t0, t1] = [t1, t0];
+        const delta = t1 - t0;
+        let frac = opts.range_distribution === 'spread' && total > 1 ? (index / (total - 1)) : Math.random();
+        taken = new Date(t0 + delta * frac);
+      }
+    }
+  }
+  return { taken, offset: meta.offset || opts.tz };
+}
+
+// ---------- Google Satellite Thumbnail Canvas Fetcher ----------
+async function fetchGoogleSatelliteCrop(lat, lon, size, zoom = 17) {
+  const n = Math.pow(2, zoom);
+  const fx = (lon + 180) / 360 * n;
+  const latRad = lat * Math.PI / 180;
+  const fy = (1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2 * n;
+  const tx = Math.floor(fx);
+  const ty = Math.floor(fy);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = 768;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#46505a';
+  ctx.fillRect(0, 0, 768, 768);
+
+  const promises = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const tileX = tx + dx;
+      const tileY = ty + dy;
+      const sub = Math.abs(tileX + tileY) % 4;
+      const url = `https://mt${sub}.google.com/vt/lyrs=y&x=${tileX}&y=${tileY}&z=${zoom}`;
+      const px = (dx + 1) * 256;
+      const py = (dy + 1) * 256;
+
+      promises.push(new Promise(resolve => {
+        const tileImg = new Image();
+        tileImg.crossOrigin = 'anonymous';
+        tileImg.onload = () => { ctx.drawImage(tileImg, px, py, 256, 256); resolve(true); };
+        tileImg.onerror = () => resolve(false);
+        tileImg.src = url;
+      }));
+    }
+  }
+
+  await Promise.all(promises);
+
+  const cx = Math.round((fx - tx + 1) * 256);
+  const cy = Math.round((fy - ty + 1) * 256);
+  const half = 180;
+
+  const cropped = document.createElement('canvas');
+  cropped.width = size;
+  cropped.height = size;
+  const cropCtx = cropped.getContext('2d');
+  cropCtx.drawImage(canvas, cx - half, cy - half, half * 2, half * 2, 0, 0, size, size);
+  return cropped;
+}
+
+function drawPin(ctx, x, y, r) {
+  ctx.save();
+  ctx.fillStyle = '#d62828';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1, Math.round(r / 5));
+
+  ctx.beginPath();
+  ctx.moveTo(x - r * 0.6, y - r * 0.9);
+  ctx.lineTo(x + r * 0.6, y - r * 0.9);
+  ctx.lineTo(x, y);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(x, y - r * 1.2, r, r, 0, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(x, y - r * 1.2, r * 0.35, r * 0.35, 0, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.restore();
+}
+
+function formatWhen(date, offsetStr) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = days[date.getDay()];
+  const pad = n => String(n).padStart(2, '0');
+  const d = pad(date.getDate());
+  const m = pad(date.getMonth() + 1);
+  const y = date.getFullYear();
+  let hours = date.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const mins = pad(date.getMinutes());
+  return `${dayName}, ${d}/${m}/${y} ${pad(hours)}:${mins} ${ampm} GMT${offsetStr}`;
+}
+
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const words = (text || '').split(' ');
+  const lines = [];
+  let currentLine = '';
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  if (lines.length > maxLines) {
+    const kept = lines.slice(0, maxLines);
+    kept[maxLines - 1] = kept[maxLines - 1].replace(/[,.\s]+$/, '') + '...';
+    return kept;
+  }
+  return lines;
+}
+
+async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset, maxSide) {
+  let w = img.naturalWidth || img.width;
+  let h = img.naturalHeight || img.height;
+  if (maxSide && (w > maxSide || h > maxSide)) {
+    const scale = Math.min(maxSide / w, maxSide / h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const s = Math.max(0.35, w / 2000);
+  const pad = Math.round(45 * s);
+  const mapPx = Math.round(330 * s);
+  const bandH = mapPx + 2 * pad;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.47)';
+  ctx.fillRect(0, h - bandH, w, bandH);
+
+  const top = h - bandH + pad;
+
+  try {
+    const satTile = await fetchGoogleSatelliteCrop(lat, lon, mapPx);
+    if (satTile) ctx.drawImage(satTile, pad, top, mapPx, mapPx);
+  } catch (err) {
+    ctx.fillStyle = '#46505a';
+    ctx.fillRect(pad, top, mapPx, mapPx);
+  }
+
+  drawPin(ctx, pad + mapPx / 2, top + mapPx / 2, 18 * s);
+
+  const x = pad + mapPx + pad;
+  const width = w - x - pad;
+  const titleSize = Math.round(58 * s);
+  const bodySize = Math.round(40 * s);
+
+  let y = top - Math.round(6 * s);
+
+  ctx.font = `bold ${titleSize}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = Math.max(2, Math.round(s * 3));
+
+  const displayTitle = title || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  const titleLines = wrapText(ctx, displayTitle, width, 1);
+  for (const line of titleLines) {
+    ctx.strokeText(line, x, y + titleSize);
+    ctx.fillText(line, x, y + titleSize);
+    y += Math.round(titleSize * 1.25);
+  }
+
+  ctx.font = `500 ${bodySize}px system-ui, -apple-system, sans-serif`;
+  ctx.lineWidth = Math.max(1.5, Math.round(s * 2));
+
+  if (address) {
+    const addrLines = wrapText(ctx, address, width, 2);
+    for (const line of addrLines) {
+      ctx.strokeText(line, x, y + bodySize);
+      ctx.fillText(line, x, y + bodySize);
+      y += Math.round(bodySize * 1.25);
+    }
+  }
+
+  const coordText = `Lat ${lat.toFixed(6)}, Long ${lon.toFixed(6)}`;
+  ctx.strokeText(coordText, x, y + bodySize);
+  ctx.fillText(coordText, x, y + bodySize);
+  y += Math.round(bodySize * 1.25);
+
+  if (taken) {
+    const timeText = formatWhen(taken, offset);
+    ctx.strokeText(timeText, x, y + bodySize);
+    ctx.fillText(timeText, x, y + bodySize);
+  }
+
+  return canvas;
+}
+
+// ---------- EXIF Building ----------
+function toDms(value) {
+  const total = Math.round(Math.abs(value) * 3600 * 10000);
+  const deg = Math.floor(total / (3600 * 10000));
+  const rest = total % (3600 * 10000);
+  const min = Math.floor(rest / (60 * 10000));
+  const sec = rest % (60 * 10000);
+  return [[deg, 1], [min, 1], [sec, 10000]];
+}
+
+function buildExifString(lat, lon, taken, offsetStr, existingRaw) {
+  let exif = existingRaw ? JSON.parse(JSON.stringify(existingRaw)) : { '0th': {}, 'Exif': {}, 'GPS': {}, 'Interop': {}, '1st': {}, 'thumbnail': null };
+  if (!exif['0th']) exif['0th'] = {};
+  if (!exif['Exif']) exif['Exif'] = {};
+  if (!exif['GPS']) exif['GPS'] = {};
+
+  exif['1st'] = {};
+  exif['thumbnail'] = null;
+  exif['0th'][piexif.ImageIFD.Software] = 'GEO-TAGER';
+  exif['0th'][piexif.ImageIFD.Orientation] = 1;
+
+  exif['GPS'][piexif.GPSIFD.GPSVersionID] = [2, 3, 0, 0];
+  exif['GPS'][piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
+  exif['GPS'][piexif.GPSIFD.GPSLatitude] = toDms(lat);
+  exif['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
+  exif['GPS'][piexif.GPSIFD.GPSLongitude] = toDms(lon);
+
+  if (taken) {
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${taken.getFullYear()}:${pad(taken.getMonth() + 1)}:${pad(taken.getDate())} ${pad(taken.getHours())}:${pad(taken.getMinutes())}:${pad(taken.getSeconds())}`;
+    exif['Exif'][piexif.ExifIFD.DateTimeOriginal] = stamp;
+    exif['Exif'][piexif.ExifIFD.DateTimeDigitized] = stamp;
+    exif['0th'][piexif.ImageIFD.DateTime] = stamp;
+    exif['Exif'][piexif.ExifIFD.OffsetTimeOriginal] = offsetStr;
+
+    const sign = offsetStr[0] === '-' ? -1 : 1;
+    const offHours = parseInt(offsetStr.slice(1, 3)) || 0;
+    const offMins = parseInt(offsetStr.slice(4, 6)) || 0;
+    const totalOffMs = sign * (offHours * 60 + offMins) * 60000;
+    const utc = new Date(taken.getTime() - totalOffMs);
+
+    const utcStamp = `${utc.getUTCFullYear()}:${pad(utc.getUTCMonth() + 1)}:${pad(utc.getUTCDate())}`;
+    exif['GPS'][piexif.GPSIFD.GPSDateStamp] = utcStamp;
+    exif['GPS'][piexif.GPSIFD.GPSTimeStamp] = [
+      [utc.getUTCHours(), 1],
+      [utc.getUTCMinutes(), 1],
+      [utc.getUTCSeconds(), 1]
+    ];
+  }
+
+  return piexif.dump(exif);
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function dataURLtoBlob(dataurl) {
+  const parts = dataurl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
+  return new Blob([u8arr], { type: mime });
+}
+
+// ---------- Preview Button ----------
+$('previewBtn').onclick = async () => {
+  const p = photos.find(x => x.selected);
+  if (!p) return alert('Select a photo first.');
+
+  const opts = getOptions();
+  let lat = p.loc ? p.loc.lat : p.meta.lat;
+  let lon = p.loc ? p.loc.lon : p.meta.lon;
+  if (lat == null || lon == null) return alert('No location for this photo. Pick one on the map or search.');
+
+  $('status').innerHTML = '<span class="spinner"></span> Rendering preview...';
+  try {
+    const img = await loadImage(p.dataUrl);
+    const { taken, offset } = resolvePhotoTime(p.meta, opts, 0, 1);
+    const title = (p.loc && p.loc.title) || '';
+    const address = (p.loc && p.loc.address) || '';
+
+    const canvas = await renderOverlayCanvas(img, lat, lon, title, address, taken, offset, 1400);
+    $('prevImg').src = canvas.toDataURL('image/jpeg', 0.9);
+    $('modal').hidden = false;
+    $('status').textContent = '';
+  } catch (err) {
+    alert('Preview failed: ' + err.message);
+    $('status').textContent = '';
+  }
+};
+$('closeModal').onclick = () => $('modal').hidden = true;
+
+// ---------- Tag & Download (Bulk Export) ----------
+$('go').onclick = async () => {
+  const sel = photos.filter(p => p.selected);
+  if (!sel.length) return alert('Select the photos to tag.');
+
+  const opts = getOptions();
+  $('go').disabled = true;
+  $('status').innerHTML = `<span class="spinner"></span> Processing ${sel.length} photo(s)...`;
+
+  const zip = new JSZip();
+  const reportRows = [['name', 'status', 'detail', 'output', 'lat', 'lon', 'taken', 'address']];
+  let okCount = 0;
+
+  for (let idx = 0; idx < sel.length; idx++) {
+    const p = sel[idx];
+    $('status').innerHTML = `<span class="spinner"></span> Processing ${idx + 1} / ${sel.length}: ${p.name}...`;
+
+    let lat = p.loc ? p.loc.lat : (opts.overwrite_gps ? null : p.meta.lat);
+    let lon = p.loc ? p.loc.lon : (opts.overwrite_gps ? null : p.meta.lon);
+    if (lat == null || lon == null) {
+      if (p.loc) { lat = p.loc.lat; lon = p.loc.lon; }
+      else if (p.meta.lat != null) { lat = p.meta.lat; lon = p.meta.lon; }
+    }
+
+    if (lat == null || lon == null) {
+      p.result = { status: 'skipped', detail: 'no location' };
+      reportRows.push([p.name, 'skipped', 'no location', '', '', '', '', '']);
+      continue;
+    }
+
+    const { taken, offset } = resolvePhotoTime(p.meta, opts, idx, sel.length);
+    const title = (p.loc && p.loc.title) || '';
+    const address = (p.loc && p.loc.address) || '';
+    const takenStr = taken ? taken.toISOString() : '';
+
+    try {
+      let finalDataUrl = p.dataUrl;
+      if (opts.overlay) {
+        const img = await loadImage(p.dataUrl);
+        const canvas = await renderOverlayCanvas(img, lat, lon, title, address, taken, offset);
+        finalDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      }
+
+      // Insert EXIF
+      const exifStr = buildExifString(lat, lon, taken, offset, p.meta.rawExif);
+      let taggedDataUrl = finalDataUrl;
+      try {
+        taggedDataUrl = piexif.insert(exifStr, finalDataUrl);
+      } catch (e) {
+        console.warn('EXIF insert fallback:', e);
+      }
+
+      const stem = p.name.replace(/\.[^/.]+$/, '').replace(/[^\w.\- ]/g, '_');
+      const outName = `${stem}_geotagged.jpg`;
+      const blob = dataURLtoBlob(taggedDataUrl);
+      zip.file(outName, blob);
+
+      p.result = { status: 'ok', detail: '' };
+      reportRows.push([p.name, 'ok', '', outName, lat, lon, takenStr, address]);
+      okCount++;
+    } catch (err) {
+      console.error(err);
+      p.result = { status: 'error', detail: err.message };
+      reportRows.push([p.name, 'error', err.message, '', lat, lon, takenStr, address]);
+    }
+  }
+
+  // Create report.csv
+  const csvContent = reportRows.map(row => row.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  zip.file('report.csv', csvContent);
+
+  $('status').innerHTML = '<span class="spinner"></span> Generating zip file...';
+  const content = await zip.generateAsync({ type: 'blob' }, meta => {
+    $('status').innerHTML = `<span class="spinner"></span> Packaging ZIP (${Math.round(meta.percent)}%)...`;
+  });
+
+  const dlLink = document.createElement('a');
+  dlLink.href = URL.createObjectURL(content);
+  dlLink.download = 'geotagged_photos.zip';
+  document.body.appendChild(dlLink);
+  dlLink.click();
+  document.body.removeChild(dlLink);
+
+  $('status').textContent = `${okCount} tagged, ${sel.length - okCount} skipped or failed. Download started!`;
+  $('go').disabled = false;
+  render();
+};
+
+render();
+</script>
+</body>
+</html>

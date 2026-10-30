@@ -24,10 +24,17 @@
     <div class="row"><input id="q" placeholder="Search address or place"><button id="searchBtn">Search</button></div>
     <ul id="hits" class="hits"></ul>
     <div id="map"></div>
-    <p class="muted small">Click the map to set the point; the address is looked up from OpenStreetMap.</p>
+    <p class="muted small">Click the map or search to set the point; address is looked up from OpenStreetMap.</p>
     <div class="row"><input id="lat" placeholder="Latitude"><input id="lon" placeholder="Longitude"></div>
     <input id="title" placeholder="Title, e.g. Bengaluru, Karnataka, India">
     <textarea id="address" rows="2" placeholder="Full address"></textarea>
+
+    <label class="check"><input type="checkbox" id="randomizeLoc"> Randomize location within area</label>
+    <div id="radiusRow" class="row" style="display:none; align-items:center; margin-bottom:6px;">
+      <input id="radiusMeters" type="number" min="10" max="100000" step="50" value="500" placeholder="Radius (meters)">
+      <span class="muted small" style="white-space:nowrap;">meters radius</span>
+    </div>
+
     <button id="apply" class="primary">Apply to selected (0)</button>
     <label class="check"><input type="checkbox" id="overwrite"> Overwrite GPS already in the photo</label>
   </section>
@@ -35,16 +42,39 @@
   <section>
     <h2>3. Time</h2>
     <label class="check"><input type="radio" name="tm" value="keep" checked> Keep the photo's own capture time</label>
+
+    <label class="check"><input type="radio" name="tm" value="static"> Set static date &amp; time for all photos</label>
+    <div id="staticBox" class="time-sub" style="display:none; margin:4px 0 8px 18px;">
+      <input id="staticTime" type="datetime-local" step="1">
+    </div>
+
+    <label class="check"><input type="radio" name="tm" value="range"> Distribute across a time range</label>
+    <div id="rangeBox" class="time-sub" style="display:none; margin:4px 0 8px 18px;">
+      <div class="small muted" style="margin-bottom:2px;">From:</div>
+      <input id="rangeStart" type="datetime-local" step="1">
+      <div class="small muted" style="margin-bottom:2px;">To:</div>
+      <input id="rangeEnd" type="datetime-local" step="1">
+      <div class="small muted" style="margin-bottom:2px;">Distribution:</div>
+      <select id="rangeDist" style="width:100%; margin-bottom:6px;">
+        <option value="random">Random timestamps within range</option>
+        <option value="spread">Evenly spaced (chronological)</option>
+      </select>
+    </div>
+
     <label class="check"><input type="radio" name="tm" value="shift"> Fix a wrong camera clock: shift by
       <input id="shift" type="number" value="0" class="num"> minutes</label>
     <label class="check"><input type="radio" name="tm" value="fill"> Photos with no time: set to
       <input id="fill" type="datetime-local" step="1"></label>
+
+    <label class="check" id="overwriteTimeLabel" style="margin-top:6px;">
+      <input type="checkbox" id="overwriteTime" checked> Overwrite existing photo time (for static/range)
+    </label>
     <label class="check">Timezone (UTC offset) <input id="tz" value="+05:30" class="num"></label>
   </section>
 
   <section>
     <h2>4. Overlay &amp; export</h2>
-    <label class="check"><input type="checkbox" id="overlay"> Draw location/time stamp on the photo</label>
+    <label class="check"><input type="checkbox" id="overlay" checked> Draw location/time stamp on the photo</label>
     <button id="previewBtn">Preview first selected</button>
     <button id="go" class="primary">Tag and download</button>
     <div id="status" class="muted"></div>

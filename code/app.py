@@ -91,7 +91,7 @@ def reverse():
     return jsonify(hit or {"error": "address lookup failed (offline?)"}), (200 if hit else 502)
 
 
-def _location(item, meta, overwrite_gps):
+def _location(item, meta, overwrite_gps, radius_m=0.0):
     """Existing EXIF GPS wins unless the user chose to overwrite it."""
     if meta["lat"] is not None and not overwrite_gps:
         return meta["lat"], meta["lon"], None, None
@@ -100,6 +100,9 @@ def _location(item, meta, overwrite_gps):
     lat, lon = float(item["lat"]), float(item["lon"])
     if not (-90 <= lat <= 90 and -180 <= lon <= 180):
         raise ValueError("coordinates out of range")
+    eff_radius = float(item.get("radius_m") or radius_m or 0.0)
+    if eff_radius > 0 and not item.get("is_randomized"):
+        lat, lon = geo.randomize_coords(lat, lon, eff_radius)
     return lat, lon, item.get("title") or "", item.get("address") or ""
 
 
@@ -115,12 +118,13 @@ def preview():
     body = request.get_json(force=True)
     item, opts = body["item"], Options.from_dict(body.get("options"))
     src = _upload_path(item["id"])
-    loc = _location(item, exiftools.read_meta(src), bool(body.get("overwrite_gps")))
+    loc = _location(item, exiftools.read_meta(src), bool(body.get("overwrite_gps")), opts.radius_m)
     if not loc:
         return jsonify({"error": "no location for this photo"}), 400
     lat, lon, title, address = loc
     title, address = _fill_address(lat, lon, title, address)
-    data = process_photo(src, None, lat, lon, title, address, opts, max_side=1400)
+    data = process_photo(src, None, lat, lon, title, address, opts, max_side=1400,
+                         custom_datetime=item.get("datetime"))
     return send_file(io.BytesIO(data), mimetype="image/jpeg")
 
 
@@ -136,13 +140,15 @@ def process():
     out_dir = DATA / "outputs" / batch
     out_dir.mkdir()
     results, used = [], set()
+    items = body.get("items", [])
+    total_items = len(items)
 
-    for item in body.get("items", []):
+    for idx, item in enumerate(items):
         res = {"id": item.get("id"), "name": item.get("name", ""), "status": "ok"}
         try:
             src = _upload_path(item["id"])
             meta = exiftools.read_meta(src)
-            loc = _location(item, meta, overwrite)
+            loc = _location(item, meta, overwrite, opts.radius_m)
             if not loc:
                 res.update(status="skipped", detail="no location (no EXIF GPS and none assigned)")
                 results.append(res)
@@ -156,7 +162,8 @@ def process():
                 n += 1
                 name = f"{stem}_geotagged_{n}.jpg"
             used.add(name)
-            info = process_photo(src, out_dir / name, lat, lon, title, address, opts)
+            info = process_photo(src, out_dir / name, lat, lon, title, address, opts,
+                                 index=idx, total=total_items, custom_datetime=item.get("datetime"))
             res.update(output=name, lat=lat, lon=lon, address=address or "", taken=info["taken"])
         except Exception as e:
             res.update(status="error", detail=str(e))

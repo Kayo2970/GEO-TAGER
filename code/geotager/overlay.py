@@ -13,7 +13,6 @@ _FONTS = {
            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
            "DejaVuSans-Bold.ttf", "Arial Bold.ttf"],
 }
-NOTE = "Note : Location and time added after capture (GEO-TAGER)"
 
 
 def _font(size, bold=False):
@@ -76,14 +75,13 @@ def draw_overlay(img, lat, lon, title, address, taken, offset):
 
     x = pad + map_px + pad
     width = w - x - pad
-    f_title, f_body, f_note = _font(int(58 * s), True), _font(int(40 * s)), _font(int(32 * s))
+    f_title, f_body = _font(int(58 * s), True), _font(int(40 * s))
     y = top - int(6 * s)
     lines = [(t, f_title) for t in _wrap(draw, title or f"{lat:.5f}, {lon:.5f}", f_title, width, 1)]
     lines += [(t, f_body) for t in _wrap(draw, address or "", f_body, width, 2)]
     lines.append((f"Lat {lat:.6f}, Long {lon:.6f}", f_body))
     if taken:
         lines.append((_when(taken, offset), f_body))
-    lines.append((NOTE, f_note))
     for text, font in lines:
         draw.text((x, y), text, fill="white", font=font, stroke_width=max(1, int(s)),
                   stroke_fill=(0, 0, 0))

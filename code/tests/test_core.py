@@ -102,7 +102,57 @@ def test_bad_offset_rejected():
     with pytest.raises(ValueError):
         Options.from_dict({"tz": "IST"})
     with pytest.raises(ValueError):
-        Options.from_dict({"time_mode": "random"})
+        Options.from_dict({"time_mode": "invalid_mode"})
+
+
+def test_randomize_coords_within_radius():
+    lat, lon = 12.9716, 77.5946
+    radius = 1000.0  # 1 km
+    for _ in range(50):
+        rlat, rlon = geo.randomize_coords(lat, lon, radius)
+        dist = geo.distance_meters(lat, lon, rlat, rlon)
+        assert dist <= radius + 5.0  # allow small rounding tolerance
+
+
+def test_static_time_mode(tmp_path):
+    has_time = make_jpeg(tmp_path / "t.jpg", "2026:10:27 09:51:00")
+    no_time = make_jpeg(tmp_path / "nt.jpg")
+    dst = tmp_path / "out.jpg"
+
+    # Static without overwrite: only affects photo without time
+    opt_no_ov = Options(time_mode="static", static_datetime="2026-10-30T12:00:00", overwrite_time=False)
+    process_photo(no_time, dst, 10, 10, "", "", opt_no_ov)
+    assert ex.read_meta(dst)["datetime"] == "2026-10-30T12:00:00"
+    process_photo(has_time, dst, 10, 10, "", "", opt_no_ov)
+    assert ex.read_meta(dst)["datetime"] == "2026-10-27T09:51:00"
+
+    # Static with overwrite: updates both
+    opt_ov = Options(time_mode="static", static_datetime="2026-10-30T12:00:00", overwrite_time=True)
+    process_photo(has_time, dst, 10, 10, "", "", opt_ov)
+    assert ex.read_meta(dst)["datetime"] == "2026-10-30T12:00:00"
+
+
+def test_range_time_mode(tmp_path):
+    src = make_jpeg(tmp_path / "a.jpg")
+    dst = tmp_path / "out.jpg"
+    t_start = "2026-10-30T09:00:00"
+    t_end = "2026-10-30T18:00:00"
+
+    # Random distribution
+    opt_rand = Options(time_mode="range", range_start=t_start, range_end=t_end,
+                       range_distribution="random", overwrite_time=True)
+    for _ in range(10):
+        process_photo(src, dst, 10, 10, "", "", opt_rand)
+        dt = datetime.fromisoformat(ex.read_meta(dst)["datetime"])
+        assert datetime.fromisoformat(t_start) <= dt <= datetime.fromisoformat(t_end)
+
+    # Spread distribution
+    opt_spread = Options(time_mode="range", range_start=t_start, range_end=t_end,
+                         range_distribution="spread", overwrite_time=True)
+    process_photo(src, dst, 10, 10, "", "", opt_spread, index=0, total=3)
+    assert ex.read_meta(dst)["datetime"] == "2026-10-30T09:00:00"
+    process_photo(src, dst, 10, 10, "", "", opt_spread, index=2, total=3)
+    assert ex.read_meta(dst)["datetime"] == "2026-10-30T18:00:00"
 
 
 def test_http_flow(tmp_path, monkeypatch):
@@ -142,3 +192,24 @@ def test_http_flow(tmp_path, monkeypatch):
 
     p = c.post("/api/preview", json={"item": body["items"][0], "options": {"overlay": True}})
     assert p.status_code == 200 and p.mimetype == "image/jpeg"
+
+    # Area randomization and time range via HTTP
+    body_rand = {
+        "items": [
+            {"id": plain["id"], "name": "p1.jpg", "lat": 12.9, "lon": 77.5, "radius_m": 500},
+            {"id": plain["id"], "name": "p2.jpg", "lat": 12.9, "lon": 77.5, "radius_m": 500},
+        ],
+        "options": {
+            "time_mode": "range",
+            "range_start": "2026-10-30T10:00:00",
+            "range_end": "2026-10-30T11:00:00",
+            "overwrite_time": True
+        }
+    }
+    out_rand = c.post("/api/process", json=body_rand).get_json()
+    assert len(out_rand["results"]) == 2
+    r1, r2 = out_rand["results"][0], out_rand["results"][1]
+    assert r1["status"] == "ok" and r2["status"] == "ok"
+    assert geo.distance_meters(12.9, 77.5, r1["lat"], r1["lon"]) <= 505
+    assert geo.distance_meters(12.9, 77.5, r2["lat"], r2["lon"]) <= 505
+    assert "2026-10-30T1" in r1["taken"] and "2026-10-30T1" in r2["taken"]

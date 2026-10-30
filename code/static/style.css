@@ -7,8 +7,8 @@ h1 { margin:0; font-size:18px; } h2 { margin:0 0 8px; font-size:13px; text-trans
 main { display:grid; grid-template-columns:340px 1fr; gap:16px; padding:16px; align-items:start; }
 @media (max-width:860px) { main { grid-template-columns:1fr; } }
 aside section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:12px; }
-input, textarea, button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
-input, textarea { width:100%; margin-bottom:6px; } textarea { resize:vertical; }
+input, textarea, select, button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+input, textarea, select { width:100%; margin-bottom:6px; } textarea { resize:vertical; }
 input[type=radio], input[type=checkbox] { width:auto; margin:0 6px 0 0; }
 .num { width:84px; display:inline-block; margin:0 4px; }
 .row { display:flex; gap:6px; } .row input { margin-bottom:6px; }
@@ -17,6 +17,7 @@ button.primary { background:var(--accent); border-color:var(--accent); color:#ff
 button:disabled { opacity:.5; cursor:default; }
 #previewBtn { width:100%; margin-bottom:4px; }
 .check { display:block; margin:6px 0; } .muted { color:var(--muted); } .small { font-size:12px; margin:4px 0; }
+.time-sub { border-left: 2px solid var(--accent); padding-left: 8px; }
 .drop { display:block; border:2px dashed var(--line); border-radius:8px; padding:22px 10px; text-align:center; cursor:pointer; }
 .drop.over { border-color:var(--accent); }
 #map { height:240px; border-radius:6px; border:1px solid var(--line); }
