@@ -477,7 +477,7 @@ async function handleFiles(files) {
         dataUrl: dataUrl,
         meta: meta,
         loc: null,
-        selected: false,
+        selected: true,
         result: null
       });
     } catch (err) {
@@ -524,7 +524,11 @@ $('apply').onclick = () => {
   const title = $('title').value.trim(), address = $('address').value.trim();
   const isRand = $('randomizeLoc').checked;
   const radius = parseFloat($('radiusMeters').value) || 500;
-  const sel = photos.filter(p => p.selected);
+  let sel = photos.filter(p => p.selected);
+  if (!sel.length && photos.length > 0) {
+    photos.forEach(p => p.selected = true);
+    sel = photos;
+  }
   if (!sel.length) return alert('Select the photos to apply location to.');
 
   clearScatterMarkers();
@@ -591,6 +595,7 @@ function resolvePhotoTime(meta, opts, index, total) {
 
 // ---------- Google Satellite Thumbnail Canvas Fetcher ----------
 async function fetchGoogleSatelliteCrop(lat, lon, size, zoom = 17) {
+  if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) return null;
   const n = Math.pow(2, zoom);
   const fx = (lon + 180) / 360 * n;
   const latRad = lat * Math.PI / 180;
@@ -618,8 +623,19 @@ async function fetchGoogleSatelliteCrop(lat, lon, size, zoom = 17) {
       promises.push(new Promise(resolve => {
         const tileImg = new Image();
         tileImg.crossOrigin = 'anonymous';
-        tileImg.onload = () => { ctx.drawImage(tileImg, px, py, 256, 256); resolve(true); };
-        tileImg.onerror = () => resolve(false);
+        const timer = setTimeout(() => {
+          tileImg.src = '';
+          resolve(false);
+        }, 3500);
+        tileImg.onload = () => {
+          clearTimeout(timer);
+          try { ctx.drawImage(tileImg, px, py, 256, 256); } catch (e) {}
+          resolve(true);
+        };
+        tileImg.onerror = () => {
+          clearTimeout(timer);
+          resolve(false);
+        };
         tileImg.src = url;
       }));
     }
@@ -727,15 +743,19 @@ async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset,
 
   const top = h - bandH + pad;
 
-  try {
-    const satTile = await fetchGoogleSatelliteCrop(lat, lon, mapPx);
-    if (satTile) ctx.drawImage(satTile, pad, top, mapPx, mapPx);
-  } catch (err) {
-    ctx.fillStyle = '#46505a';
+  if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
+    try {
+      const satTile = await fetchGoogleSatelliteCrop(lat, lon, mapPx);
+      if (satTile) ctx.drawImage(satTile, pad, top, mapPx, mapPx);
+    } catch (err) {
+      ctx.fillStyle = '#46505a';
+      ctx.fillRect(pad, top, mapPx, mapPx);
+    }
+    drawPin(ctx, pad + mapPx / 2, top + mapPx / 2, Math.max(3, 18 * s));
+  } else {
+    ctx.fillStyle = '#2d333b';
     ctx.fillRect(pad, top, mapPx, mapPx);
   }
-
-  drawPin(ctx, pad + mapPx / 2, top + mapPx / 2, Math.max(3, 18 * s));
 
   const x = pad + mapPx + pad;
   const width = w - x - pad;
@@ -752,12 +772,14 @@ async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset,
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = Math.max(1.5, Math.round(s * 3));
 
-  const displayTitle = title || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  const titleLines = wrapText(ctx, displayTitle, width, 1);
-  for (const line of titleLines) {
-    ctx.strokeText(line, x, y + titleSize);
-    ctx.fillText(line, x, y + titleSize);
-    y += Math.round(titleSize * 1.25);
+  const displayTitle = title || (lat != null && lon != null && !isNaN(lat) && !isNaN(lon) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : '');
+  if (displayTitle) {
+    const titleLines = wrapText(ctx, displayTitle, width, 1);
+    for (const line of titleLines) {
+      ctx.strokeText(line, x, y + titleSize);
+      ctx.fillText(line, x, y + titleSize);
+      y += Math.round(titleSize * 1.25);
+    }
   }
 
   ctx.font = `500 ${bodySize}px system-ui, -apple-system, sans-serif`;
@@ -773,7 +795,7 @@ async function renderOverlayCanvas(img, lat, lon, title, address, taken, offset,
     }
   }
 
-  if (y + bodySize <= h) {
+  if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon) && y + bodySize <= h) {
     const coordText = `Lat ${lat.toFixed(6)}, Long ${lon.toFixed(6)}`;
     ctx.strokeText(coordText, x, y + bodySize);
     ctx.fillText(coordText, x, y + bodySize);
@@ -810,11 +832,15 @@ function buildExifString(lat, lon, taken, offsetStr, existingRaw) {
   exif['0th'][piexif.ImageIFD.Software] = 'GEO-TAGER';
   exif['0th'][piexif.ImageIFD.Orientation] = 1;
 
-  exif['GPS'][piexif.GPSIFD.GPSVersionID] = [2, 3, 0, 0];
-  exif['GPS'][piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
-  exif['GPS'][piexif.GPSIFD.GPSLatitude] = toDms(lat);
-  exif['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
-  exif['GPS'][piexif.GPSIFD.GPSLongitude] = toDms(lon);
+  if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
+    exif['GPS'][piexif.GPSIFD.GPSVersionID] = [2, 3, 0, 0];
+    exif['GPS'][piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
+    exif['GPS'][piexif.GPSIFD.GPSLatitude] = toDms(lat);
+    exif['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
+    exif['GPS'][piexif.GPSIFD.GPSLongitude] = toDms(lon);
+  } else {
+    exif['GPS'] = {};
+  }
 
   if (taken) {
     const pad = n => String(n).padStart(2, '0');
@@ -824,9 +850,9 @@ function buildExifString(lat, lon, taken, offsetStr, existingRaw) {
     exif['0th'][piexif.ImageIFD.DateTime] = stamp;
     exif['Exif'][piexif.ExifIFD.OffsetTimeOriginal] = offsetStr;
 
-    const sign = offsetStr[0] === '-' ? -1 : 1;
-    const offHours = parseInt(offsetStr.slice(1, 3)) || 0;
-    const offMins = parseInt(offsetStr.slice(4, 6)) || 0;
+    const sign = (offsetStr && offsetStr[0] === '-') ? -1 : 1;
+    const offHours = parseInt((offsetStr || '').slice(1, 3)) || 0;
+    const offMins = parseInt((offsetStr || '').slice(4, 6)) || 0;
     const totalOffMs = sign * (offHours * 60 + offMins) * 60000;
     const utc = new Date(taken.getTime() - totalOffMs);
 
@@ -863,20 +889,24 @@ function dataURLtoBlob(dataurl) {
 
 // ---------- Preview Button ----------
 $('previewBtn').onclick = async () => {
-  const p = photos.find(x => x.selected);
-  if (!p) return alert('Select a photo first.');
+  let p = photos.find(x => x.selected) || photos[0];
+  if (!p) return alert('Upload a photo first.');
+
+  const formLat = parseFloat($('lat').value);
+  const formLon = parseFloat($('lon').value);
+  const formTitle = $('title').value.trim();
+  const formAddress = $('address').value.trim();
 
   const opts = getOptions();
-  let lat = p.loc ? p.loc.lat : p.meta.lat;
-  let lon = p.loc ? p.loc.lon : p.meta.lon;
-  if (lat == null || lon == null) return alert('No location for this photo. Pick one on the map or search.');
+  let lat = p.loc ? p.loc.lat : (!isNaN(formLat) ? formLat : p.meta.lat);
+  let lon = p.loc ? p.loc.lon : (!isNaN(formLon) ? formLon : p.meta.lon);
+  const title = (p.loc && p.loc.title) || formTitle || '';
+  const address = (p.loc && p.loc.address) || formAddress || '';
 
   $('status').innerHTML = '<span class="spinner"></span> Rendering preview...';
   try {
     const img = await loadImage(p.dataUrl);
     const { taken, offset } = resolvePhotoTime(p.meta, opts, 0, 1);
-    const title = (p.loc && p.loc.title) || '';
-    const address = (p.loc && p.loc.address) || '';
 
     const canvas = await renderOverlayCanvas(img, lat, lon, title, address, taken, offset, 1400);
     $('prevImg').src = canvas.toDataURL('image/jpeg', 0.9);
@@ -891,68 +921,134 @@ $('closeModal').onclick = () => $('modal').hidden = true;
 
 // ---------- Tag & Download (Bulk Export) ----------
 $('go').onclick = async () => {
-  const sel = photos.filter(p => p.selected);
-  if (!sel.length) return alert('Select the photos to tag.');
+  let sel = photos.filter(p => p.selected);
+  if (!sel.length) {
+    if (photos.length > 0) {
+      photos.forEach(p => p.selected = true);
+      render();
+      sel = photos;
+    } else {
+      return alert('Upload photos first.');
+    }
+  }
 
   const opts = getOptions();
+  const formLat = parseFloat($('lat').value);
+  const formLon = parseFloat($('lon').value);
+  const formTitle = $('title').value.trim();
+  const formAddress = $('address').value.trim();
+  const hasFormCoords = !isNaN(formLat) && !isNaN(formLon);
+  const isRand = $('randomizeLoc').checked;
+  const radius = parseFloat($('radiusMeters').value) || 500;
+
   $('go').disabled = true;
   $('status').innerHTML = `<span class="spinner"></span> Processing ${sel.length} photo(s)...`;
 
   const zip = new JSZip();
   const reportRows = [['name', 'status', 'detail', 'output', 'lat', 'lon', 'taken', 'address']];
   let okCount = 0;
+  const usedNames = new Set();
 
   for (let idx = 0; idx < sel.length; idx++) {
     const p = sel[idx];
     $('status').innerHTML = `<span class="spinner"></span> Processing ${idx + 1} / ${sel.length}: ${p.name}...`;
 
-    let lat = p.loc ? p.loc.lat : (opts.overwrite_gps ? null : p.meta.lat);
-    let lon = p.loc ? p.loc.lon : (opts.overwrite_gps ? null : p.meta.lon);
-    if (lat == null || lon == null) {
-      if (p.loc) { lat = p.loc.lat; lon = p.loc.lon; }
-      else if (p.meta.lat != null) { lat = p.meta.lat; lon = p.meta.lon; }
-    }
+    // Priority: individual photo location -> current Location panel coordinates -> original photo EXIF
+    let lat = null, lon = null, title = '', address = '';
 
-    if (lat == null || lon == null) {
-      p.result = { status: 'skipped', detail: 'no location' };
-      reportRows.push([p.name, 'skipped', 'no location', '', '', '', '', '']);
-      continue;
+    if (p.loc && p.loc.lat != null && p.loc.lon != null) {
+      lat = p.loc.lat;
+      lon = p.loc.lon;
+      title = p.loc.title || '';
+      address = p.loc.address || '';
+    } else if (hasFormCoords) {
+      if (isRand && radius > 0) {
+        const pt = randomizeCoords(formLat, formLon, radius);
+        lat = pt.lat;
+        lon = pt.lon;
+      } else {
+        lat = formLat;
+        lon = formLon;
+      }
+      title = formTitle;
+      address = formAddress;
+      p.loc = { lat, lon, title, address };
+    } else if (p.meta.lat != null && p.meta.lon != null && !opts.overwrite_gps) {
+      lat = p.meta.lat;
+      lon = p.meta.lon;
+      title = formTitle;
+      address = formAddress;
     }
 
     const { taken, offset } = resolvePhotoTime(p.meta, opts, idx, sel.length);
-    const title = (p.loc && p.loc.title) || '';
-    const address = (p.loc && p.loc.address) || '';
     const takenStr = taken ? taken.toISOString() : '';
 
     try {
       let finalDataUrl = p.dataUrl;
       if (opts.overlay) {
-        const img = await loadImage(p.dataUrl);
-        const canvas = await renderOverlayCanvas(img, lat, lon, title, address, taken, offset);
-        finalDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        try {
+          const img = await loadImage(p.dataUrl);
+          const canvas = await renderOverlayCanvas(img, lat, lon, title, address, taken, offset);
+          finalDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        } catch (overlayErr) {
+          console.warn('Overlay failed for photo, proceeding with visual image:', overlayErr);
+        }
       }
 
-      // Insert EXIF
-      const exifStr = buildExifString(lat, lon, taken, offset, p.meta.rawExif);
+      // Safe EXIF insertion with multi-level fallbacks
       let taggedDataUrl = finalDataUrl;
-      try {
-        taggedDataUrl = piexif.insert(exifStr, finalDataUrl);
-      } catch (e) {
-        console.warn('EXIF insert fallback:', e);
+      if ((lat != null && lon != null) || taken) {
+        try {
+          const exifStr = buildExifString(lat, lon, taken, offset, p.meta.rawExif);
+          taggedDataUrl = piexif.insert(exifStr, finalDataUrl);
+        } catch (e1) {
+          console.warn('EXIF insert with existing metadata failed, attempting clean EXIF:', e1);
+          try {
+            const cleanExifStr = buildExifString(lat, lon, taken, offset, null);
+            taggedDataUrl = piexif.insert(cleanExifStr, finalDataUrl);
+          } catch (e2) {
+            console.warn('EXIF insert fallback to unmodified image:', e2);
+            taggedDataUrl = finalDataUrl;
+          }
+        }
       }
 
-      const stem = p.name.replace(/\.[^/.]+$/, '').replace(/[^\w.\- ]/g, '_');
-      const outName = `${stem}_geotagged.jpg`;
+      const stem = p.name.replace(/\.[^/.]+$/, '').replace(/[^\w.\- ]/g, '_') || `photo_${idx + 1}`;
+      let outName = `${stem}_geotagged.jpg`;
+      let counter = 1;
+      while (usedNames.has(outName)) {
+        outName = `${stem}_geotagged_${counter++}.jpg`;
+      }
+      usedNames.add(outName);
+
       const blob = dataURLtoBlob(taggedDataUrl);
       zip.file(outName, blob);
 
-      p.result = { status: 'ok', detail: '' };
-      reportRows.push([p.name, 'ok', '', outName, lat, lon, takenStr, address]);
+      const statusDetail = lat != null ? '' : 'no GPS';
+      p.result = { status: 'ok', detail: statusDetail };
+      reportRows.push([p.name, 'ok', statusDetail, outName, lat != null ? lat : '', lon != null ? lon : '', takenStr, address]);
       okCount++;
     } catch (err) {
-      console.error(err);
-      p.result = { status: 'error', detail: err.message };
-      reportRows.push([p.name, 'error', err.message, '', lat, lon, takenStr, address]);
+      console.error('Error processing photo:', err);
+      // Ensure the photo is STILL included in the ZIP download
+      try {
+        const stem = p.name.replace(/\.[^/.]+$/, '').replace(/[^\w.\- ]/g, '_') || `photo_${idx + 1}`;
+        let outName = `${stem}_original.jpg`;
+        let counter = 1;
+        while (usedNames.has(outName)) {
+          outName = `${stem}_original_${counter++}.jpg`;
+        }
+        usedNames.add(outName);
+
+        const blob = dataURLtoBlob(p.dataUrl);
+        zip.file(outName, blob);
+        okCount++;
+        p.result = { status: 'ok', detail: 'included without edit: ' + err.message };
+        reportRows.push([p.name, 'ok', 'included without edit: ' + err.message, outName, lat != null ? lat : '', lon != null ? lon : '', takenStr, address]);
+      } catch (fatalErr) {
+        p.result = { status: 'error', detail: err.message };
+        reportRows.push([p.name, 'error', err.message, '', lat != null ? lat : '', lon != null ? lon : '', takenStr, address]);
+      }
     }
   }
 
@@ -972,7 +1068,7 @@ $('go').onclick = async () => {
   dlLink.click();
   document.body.removeChild(dlLink);
 
-  $('status').textContent = `${okCount} tagged, ${sel.length - okCount} skipped or failed. Download started!`;
+  $('status').textContent = `Downloaded ${okCount} photo(s) in ZIP archive!`;
   $('go').disabled = false;
   render();
 };

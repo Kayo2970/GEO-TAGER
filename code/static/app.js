@@ -1,4 +1,4 @@
-const $ = id => document.getElementById(id);
+﻿const $ = id => document.getElementById(id);
 const photos = [];           // {id, name, meta, loc, selected, result}
 let marker = null;
 let radiusCircle = null;
@@ -10,18 +10,18 @@ const map = L.map('map').setView([20.5937, 78.9629], 4);
 const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
   subdomains: ['0', '1', '2', '3'],
   maxZoom: 20,
-  attribution: '© Google Maps'
+  attribution: 'Â© Google Maps'
 });
 
 const googlePure = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
   subdomains: ['0', '1', '2', '3'],
   maxZoom: 20,
-  attribution: '© Google Maps'
+  attribution: 'Â© Google Maps'
 });
 
 const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
-  attribution: '© OpenStreetMap contributors'
+  attribution: 'Â© OpenStreetMap contributors'
 });
 
 // Google Satellite (Hybrid) is the default base map
@@ -153,7 +153,7 @@ async function upload(files) {
     $('uploadStatus').textContent = `Uploading ${Math.min(i + 8, files.length)} / ${files.length}...`;
     const fd = new FormData(); files.slice(i, i + 8).forEach(f => fd.append('files', f));
     const res = await (await fetch('/api/upload', { method: 'POST', body: fd })).json();
-    res.forEach(p => p.error ? errors.push(`${p.name}: ${p.error}`) : photos.push({ ...p, loc: null, selected: false }));
+    res.forEach(p => p.error ? errors.push(`${p.name}: ${p.error}`) : photos.push({ ...p, loc: null, selected: true }));
     render();
   }
   $('uploadStatus').textContent = errors.length ? errors.join('; ') : `${files.length} photo(s) added.`;
@@ -168,7 +168,7 @@ function render() {
     const gps = p.meta.lat != null ? `<span class="badge ok">GPS ${p.meta.lat.toFixed(4)}, ${p.meta.lon.toFixed(4)}</span>` : '<span class="badge warn">no GPS</span>';
     const t = fmtTime(p.meta.datetime);
     const time = t ? `<span class="badge ok">${t}</span>` : '<span class="badge warn">no time</span>';
-    const loc = p.loc ? `<span class="badge ok">→ ${p.loc.title ? p.loc.title + ' ' : ''}(${p.loc.lat.toFixed(4)}, ${p.loc.lon.toFixed(4)})</span>` : '';
+    const loc = p.loc ? `<span class="badge ok">â†’ ${p.loc.title ? p.loc.title + ' ' : ''}(${p.loc.lat.toFixed(4)}, ${p.loc.lon.toFixed(4)})</span>` : '';
     const res = p.result ? `<span class="badge ${p.result.status === 'ok' ? 'ok' : 'warn'}">${p.result.status}${p.result.detail ? ': ' + p.result.detail : ''}</span>` : '';
     c.innerHTML = `<img src="/api/thumb/${p.id}" loading="lazy"><div class="info"><div class="name" title="${p.name}">${p.name}</div>${gps}${time}${loc}${res}</div>`;
     c.onclick = () => { p.selected = !p.selected; render(); };
@@ -193,7 +193,11 @@ $('apply').onclick = () => {
   const title = $('title').value.trim(), address = $('address').value.trim();
   const isRand = $('randomizeLoc').checked;
   const radius = parseFloat($('radiusMeters').value) || 500;
-  const sel = photos.filter(p => p.selected);
+  let sel = photos.filter(p => p.selected);
+  if (!sel.length && photos.length > 0) {
+    photos.forEach(p => p.selected = true);
+    sel = photos;
+  }
   if (!sel.length) return alert('Select the photos to apply location to.');
 
   clearScatterMarkers();
@@ -232,10 +236,20 @@ function options() {
     tz: $('tz').value.trim()
   };
 }
-const item = p => ({ id: p.id, name: p.name, ...(p.loc || {}) });
+const item = p => {
+  const formLat = parseFloat($('lat').value);
+  const formLon = parseFloat($('lon').value);
+  const loc = p.loc || (!isNaN(formLat) && !isNaN(formLon) ? {
+    lat: formLat,
+    lon: formLon,
+    title: $('title').value.trim(),
+    address: $('address').value.trim()
+  } : {});
+  return { id: p.id, name: p.name, ...loc };
+};
 
 $('previewBtn').onclick = async () => {
-  const p = photos.find(p => p.selected); if (!p) return alert('Select a photo first.');
+  const p = photos.find(p => p.selected) || photos[0]; if (!p) return alert('Select or upload a photo first.');
   $('status').textContent = 'Rendering preview...';
   const r = await fetch('/api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ item: item(p), options: options(), overwrite_gps: $('overwrite').checked }) });
@@ -246,7 +260,12 @@ $('previewBtn').onclick = async () => {
 $('closeModal').onclick = () => $('modal').hidden = true;
 
 $('go').onclick = async () => {
-  const sel = photos.filter(p => p.selected);
+  let sel = photos.filter(p => p.selected);
+  if (!sel.length && photos.length > 0) {
+    photos.forEach(p => p.selected = true);
+    sel = photos;
+    render();
+  }
   if (!sel.length) return alert('Select the photos to tag.');
   $('go').disabled = true; $('status').textContent = `Processing ${sel.length} photo(s)...`;
   try {

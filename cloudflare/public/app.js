@@ -1,4 +1,4 @@
-const $ = id => document.getElementById(id);
+﻿const $ = id => document.getElementById(id);
 const photos = [];           // {id, name, file, thumb, meta, loc, selected, result}
 let marker = null, nextId = 1;
 piexif.TAGS.Exif[36881] = { name: 'OffsetTimeOriginal', type: 'Ascii' };   // missing from piexifjs
@@ -6,7 +6,7 @@ piexif.TAGS.Exif[36881] = { name: 'OffsetTimeOriginal', type: 'Ascii' };   // mi
 // ---------- map ----------
 const map = L.map('map').setView([20.5937, 78.9629], 4);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+  maxZoom: 19, attribution: 'Â© OpenStreetMap contributors' }).addTo(map);
 
 function setPoint(lat, lon, fly) {
   $('lat').value = (+lat).toFixed(6); $('lon').value = (+lon).toFixed(6);
@@ -114,7 +114,7 @@ function render() {
     const c = document.createElement('div'); c.className = 'card' + (p.selected ? ' sel' : '');
     const gps = p.meta.lat != null ? `<span class="badge ok">GPS ${p.meta.lat.toFixed(4)}, ${p.meta.lon.toFixed(4)}</span>` : '<span class="badge warn">no GPS</span>';
     const time = p.meta.datetime ? `<span class="badge ok">${p.meta.datetime.replace('T', ' ')}</span>` : '<span class="badge warn">no time</span>';
-    const loc = p.loc ? `<span class="badge ok">→ ${esc(p.loc.title || p.loc.lat.toFixed(4) + ', ' + p.loc.lon.toFixed(4))}</span>` : '';
+    const loc = p.loc ? `<span class="badge ok">â†’ ${esc(p.loc.title || p.loc.lat.toFixed(4) + ', ' + p.loc.lon.toFixed(4))}</span>` : '';
     const res = p.result ? `<span class="badge ${p.result.status === 'ok' ? 'ok' : 'warn'}">${p.result.status}${p.result.detail ? ': ' + esc(p.result.detail) : ''}</span>` : '';
     c.innerHTML = `<img src="${p.thumb}"><div class="info"><div class="name" title="${esc(p.name)}">${esc(p.name)}</div>${gps}${time}${loc}${res}</div>`;
     c.onclick = () => { p.selected = !p.selected; render(); };
@@ -220,7 +220,10 @@ function options() {
 
 function finalLocation(p, overwrite) {
   if (p.meta.lat != null && !overwrite) return { lat: p.meta.lat, lon: p.meta.lon, title: null, address: null };
-  return p.loc;
+  if (p.loc) return p.loc;
+  const formLat = parseFloat($('lat').value), formLon = parseFloat($('lon').value);
+  if (!isNaN(formLat) && !isNaN(formLon)) return { lat: formLat, lon: formLon, title: $('title').value.trim(), address: $('address').value.trim() };
+  return null;
 }
 
 // Returns a JPEG data URL with tags (and overlay, when asked) applied. Never touches the original file.
