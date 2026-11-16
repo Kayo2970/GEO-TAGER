@@ -2,18 +2,32 @@
 
 Local web app for bulk geotagging photos with their **real** location and capture time, using Google Maps satellite imagery. Nothing leaves your machine except map-tile lookups. Original files are never modified; tagged copies are returned as a zip.
 
-## 🚀 How to Run (Dead Simple)
+---
 
-### Option 1: Double-Click the HTML file (Zero Installation)
-Simply double-click **`index.html`** in your file manager / Finder.
-- Runs 100% locally in your browser.
-- No terminal, no Python, no dependencies needed.
+## 🚀 How to Run (Single Click on Any OS)
 
-### Option 2: Double-Click the Mac Launcher
-Double-click **`start.command`** in Finder.
-- Automatically launches the local Python server and pops open the app in your browser at `http://127.0.0.1:5000`.
+### 🌟 Universal One-Click Launch (Any OS: Windows, macOS, Linux)
+Double-click **`Launch GEO-TAGER.html`** in your file manager or browser.
+- Displays a single **"🚀 Start GEO-TAGER"** button.
+- Automatically connects to your local Python server if running, or launches the 100% standalone web app.
+- Zero installation or command-line needed!
 
-### Option 3: Terminal
+---
+
+### Native 1-Click Launchers
+
+| Operating System | How to Start | What it does |
+| :--- | :--- | :--- |
+| **Any OS (Universal)** | Double-click `Launch GEO-TAGER.html` | Starts app immediately in default web browser |
+| **Windows** | Double-click `start.bat` | Starts Flask server and opens default browser |
+| **macOS** | Double-click `start.command` | Starts Flask server and opens browser |
+| **Linux** | Run `./start.sh` | Starts Flask server and opens default browser |
+| **Python (Cross-Platform)** | Run `python start.py` | Auto-detects environment, starts server & opens browser |
+| **Standalone Browser** | Double-click `index.html` | Runs 100% in-browser offline with zero dependencies |
+
+---
+
+### Manual Terminal Run
 ```bash
 pip install -r code/requirements.txt
 python code/app.py        # then open http://127.0.0.1:5000
@@ -21,14 +35,22 @@ python code/app.py        # then open http://127.0.0.1:5000
 
 > **Cloudflare Workers version:** see [`cloudflare/`](cloudflare/README.md) for a browser-only build you can deploy with `wrangler deploy`.
 
+---
+
 ## 📁 Project Structure
 
-- **`index.html`**: Standalone single-file application. Click to run anywhere!
-- **`start.command`**: macOS one-click launcher for the Python server.
-- **`code/`**: All backend Python code, modules, tests, and dependencies.
+- **`Launch GEO-TAGER.html`**: Universal cross-platform launcher with a single start button.
+- **`index.html`**: Standalone single-file application. Works on any browser!
+- **`start.bat`**: Windows batch launcher.
+- **`start.command`**: macOS one-click launcher.
+- **`start.sh`**: Linux shell launcher.
+- **`start.py`**: Cross-platform Python launcher script.
+- **`code/`**: Backend Python code, modules, tests, and dependencies.
   - `code/app.py`: Flask local API server.
   - `code/geotager/`: EXIF reading/writing, geocoding, and image processing modules.
   - `code/tests/`: Automated unit & integration tests.
+
+---
 
 ## What it does
 
@@ -45,8 +67,10 @@ python code/app.py        # then open http://127.0.0.1:5000
   - Fill missing times on photos that have none.
   - Configurable timezone offset (default `+05:30`).
 - **Writes EXIF**: GPS latitude/longitude, GPS date/time (UTC), DateTimeOriginal, OffsetTime. JPEGs are not re-encoded unless an overlay is drawn.
-- **Location & Time Stamp Overlay**: Enabled by default to draw a clean GPS camera-style badge featuring a Google Maps Satellite thumbnail with pin, title, address, coordinates, and capture time (without promotional disclaimers). Can be unchecked for pure EXIF-only mode.
+- **Location & Time Stamp Overlay**: Enabled by default to draw a clean GPS camera-style badge featuring a Google Maps Satellite thumbnail with pin, title, address, coordinates, and capture time (without promotional disclaimers). Stamp is dynamically restricted to the lower 1/4 of the image. Can be unchecked for pure EXIF-only mode.
 - **Export**: zip of tagged photos plus `report.csv` (status, coordinates, time, address per photo; skipped photos say why).
+
+---
 
 ## Notes
 
@@ -54,6 +78,9 @@ python code/app.py        # then open http://127.0.0.1:5000
 - Nominatim allows about one request per second; the app throttles itself. Set `NOMINATIM_URL` / `TILE_URL` to use custom servers.
 - Map and address lookups need internet; tagging itself works offline (the overlay shows "map unavailable" if tiles can't be fetched).
 - EXIF is written with a `Software=GEO-TAGER` tag so edited files remain identifiable.
+- **Credits & Disclaimer**: Developed by Kayomarz Pavri. Users are solely responsible for the content and metadata of the images they produce.
+
+---
 
 ## Tests
 
